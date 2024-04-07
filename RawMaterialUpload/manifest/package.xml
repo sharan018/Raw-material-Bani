@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+	<types>
+		<members>AzureFileStorageForMaterial</members>
+		<members>AzureMaterialFileStorageService</members>
+		<members>AzureMaterialSuccessFileUploadBatch</members>
+		<members>AzureUserMaterialFileUploadBatch</members>
+		<members>DeleteMaterialAdminAccess</members>
+		<members>DeleteMaterialRecordBasedOnId</members>
+		<members>DeleteMaterialRecordsBasedonIdForAdmin</members>
+		<members>DeleteTheMaterialRecordsBasedonId</members>
+		<members>GetMaterialUploadMasterData</members>
+		<members>MaterialConvertedFileDownloadController</members>
+		<members>MaterialFileDownloadController</members>
+		<members>MaterialSuccessData</members>
+		<members>MaterialUploadValidationFailSummary</members>
+		<members>ProcessMaterialUploadData</members>
+		<members>UploadMaterial</members>
+		<members>ViewMaterialErrorSummary</members>
+		<members>validateMaterialUploadRowsB ulk</members>
+		<name>ApexClass</name>
+	</types>
+	<types>
+		<members>RowMaterialUpload</members>
+		<name>AuraDefinitionBundle</name>
+	</types>
+	<version>55.0</version>
+</Package>

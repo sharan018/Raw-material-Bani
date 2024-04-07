@@ -1,0 +1,852 @@
+<aura:component controller="UploadMaterial"
+  implements="force:AppHostable,flexipage:availableForAllPageTypes,force:hasRecordId,force:lightningQuickActionWithoutHeader,forceCommunity:availableForAllPageTypes"
+  access="global">
+  <aura:attribute name="vfHost" type="String" default="https://mainetti--lightsand--c.cs31.visual.force.com" />
+  <!-- Imports -->
+  <ltng:require scripts="{!$Resource.papaparse}" />
+  <!-- attributes -->
+  <aura:attribute name="fromdate" type="Date" default="" />
+  <aura:attribute name="todate" type="Date" default="" />
+  <aura:attribute name="data" type="object" />
+  <aura:attribute name="errordata" type="object" />
+  <aura:attribute name="flag" type="Boolean" default="true" />
+  <aura:attribute name="toggleSpinner" type="boolean" default="false" />
+  <!-- <aura:attribute name="mainettiCompanyMap" type="Map" /> -->
+  <aura:attribute name="selectedMainettiCompany" type="string" />
+  <aura:attribute name="cmp" type="Partner__c" default="{'sobjectType':'Partner__c', 'Name': ''}" />
+  <aura:attribute name="recordStatusMap" type="Map" />
+  <aura:attribute name="batchStatusMap" type="Map" />
+  <aura:attribute name="record" type="Inventory_Transaction_Master__c"
+    default="{'sobjectType':'c', 'Record_Type__c': '', 'Batch_Status__c': ''}" />
+  <!-- RecordType Search On Change for search button -->
+  <aura:attribute name="recordTypeSearch" type="string" />
+  <aura:attribute name="srch" type="Material_upload__c"
+    default="{'sobjectType':'Material_upload__c', 'Record_Type__c': ''}" />
+  <!-- Record Status Attributes  Started -->
+  <aura:attribute name="selectedRecordType" type="string" />
+  <!--<aura:attribute name="recordStatusMap" type="Map"/>-->
+  <aura:attribute name="itm" type="Material_upload__c"
+    default="{'sobjectType':'Material_upload__c', 'Record_Type__c': ''}" />
+  <!-- Record Status Attributed Ended      
+    <aura:attribute name="options" type="List" />
+    <aura:attribute name="selectedValue" type="String" />   -->
+  <!-- 'fileName' attribute for display the selected file name -->
+  <aura:attribute name="fileName" type="String" default="No File Selected.." />
+  <aura:attribute name="fileSize" type="String" />
+  <aura:attribute name="reuploadBatchNo" type="string" />
+  <aura:attribute name="BatchStatus" type="string" />
+  <aura:attribute name="childRecordType" type="string" />
+  <aura:attribute name="appName" type="string" />
+
+  <aura:attribute name="submitMaterial" type="Boolean" default="true" />
+  <!-- submitSales -->
+  <aura:attribute name="selectedMonth" type="string" />
+  <aura:attribute name="yearList" type="List" />
+  <aura:attribute name="prvsyearList" type="List" />
+  <aura:attribute name="selectedYear" type="String" />
+  <aura:attribute name="optionss" type="Map" />
+  <aura:attribute name="batchstatusList" type="List" />
+  <!-- <aura:attribute name="selectedMonth" type="String" />     -->
+  <aura:attribute name="companyWeekData" type="object" />
+  <aura:attribute name="chunkCount" type="Integer" default="0" />
+  <!-- Date by which company should upload sales files for every month -->
+  <aura:attribute name="companyMonthDate" type="integer" />
+  <!-- handlers -->
+  <aura:method name="rerenderWarning" action="{! c.viewError}" />
+  <aura:method name="rerenderList" action="{! c.show}" />
+  <aura:handler name="init" value="{!this}" action="{!c.doInit}" />
+  <aura:handler event="force:refreshView" action="{!c.doInit}" />
+  <aura:handler name="init" value="{!this}" action="{!c.show}" />
+  <aura:attribute name="isButtonActive" type="Boolean" default="false" />
+  <!-- handlers for Mainetti Sales Dropdown Starting -->
+  <aura:attribute name="SalesCompanyMap" type="Map" />
+  <aura:attribute name="selectedSalesCompany" type="string" />
+  <aura:attribute name="selectedSalesCompanySearch" type="string" />
+  <aura:attribute name="cmpsales" type="Partner__c"
+    default="{'sobjectType':'Partner__c', 'Sales_Data_Company__c': ''}" />
+  <aura:attribute name="cmpsalesSearch" type="Partner__c"
+    default="{'sobjectType':'Partner__c', 'Sales_Data_Company__c': ''}" />
+
+  <!-- handlers for Mainetti Sales Dropdown Ending -->
+
+  <!-- Attribute for the Reupload Starting -->
+  <aura:attribute name="errorReupload" type="Boolean" default="false" />
+  <aura:attribute name="isReupload" type="Boolean" default="false" />
+  <aura:attribute name="isChunkUpload" type="Boolean" default="false" />
+
+  <!-- File Upload Attributes -->
+  <aura:attribute name="accept" type="List" default="['.csv']" />
+  <aura:attribute name="multiple" type="Boolean" default="false" />
+  <aura:attribute name="disabled" type="Boolean" default="false" />
+  <!-- File Upload Attributes Ending -->
+  <aura:attribute name="openBulkUploadConfirmation" type="Boolean" default="false" />
+  <aura:attribute name="openFileDataSubmitted" type="Boolean" default="false" />
+
+  <!-- <aura:attribute name="IsCompanyDefault" type="string" />-->
+  <aura:attribute name="IsMonthDefault" type="string" />
+
+  <aura:attribute name="IsYearDefault" type="string" />
+  <aura:attribute name="IsCompanyDefault" type="string" />
+  <aura:attribute name="selectedYearDup" type="String" />
+  <aura:attribute name="parseSalesFileChunkBoolean" type="boolean" default="true" />
+  <aura:attribute name="loaded" type="Boolean" default="false" />
+  <aura:attribute name="BatchId" type="string" />
+
+  <!-- Attribute For Maintaince Model-->
+  <aura:attribute name="openMaintainceModal" type="Boolean" default="false" />
+  <aura:attribute name="MaintainceAdminAccess" type="Boolean" default="false" />
+  <aura:attribute name="withinperiod" type="Boolean" default="true" />
+  <aura:attribute name="MaintainceStartDate" type="Date" default="2021-09-15" />
+  <aura:attribute name="MaintainceEndDate" type="Date" default="2021-09-16" />
+
+  <aura:if isTrue="{! v.loaded }">
+    <lightning:spinner alternativeText="Loading" />
+  </aura:if>
+
+  <!-- Page Header -->
+  <div class="slds-page-header" role="banner">
+    <div class="slds-grid">
+      <div class="slds-col slds-has-flexi-truncate">
+        <!-- HEADING AREA -->
+
+        <h1 class="slds-page-header__title slds-truncate" title="Inventory Transaction Master">
+          <lightning:icon iconName="standard:product_item_transaction" variant="brand" alternativeText="Material Upload"
+            title="Material Upload" />
+          Raw Material Upload
+        </h1>
+        <!-- / HEADING AREA -->
+      </div>
+      <div class="slds-col slds-no-flex slds-grid slds-align-top">
+        <lightning:button label="Upload Material" title="Upload Material" iconName="utility:upload" iconPosition="left"
+          variant="brand" name="inventoryModal" onclick="{!c.newUpload}" />
+      </div>
+    </div>
+  </div>
+  <!-- Page Header -->
+  <!-- Modal PopUp -->
+  <div>
+    <section aura:id="inventoryModal" role="dialog" tabindex="-1" aria-labelledby="customerdata" aria-modal="true"
+      aria-describedby="customerBody" class="slds-modal">
+      <div class="slds-modal__container">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <header class="slds-modal__header">
+          <lightning:buttonIcon class="slds-modal__close" alternativeText="Close" iconName="utility:close"
+            onclick="{!c.closeModal}" variant="bare-inverse" size="large"></lightning:buttonIcon>
+          <h1 id="customerdata" class="slds-text-heading_medium slds-hyphenate"> File Upload </h1>
+        </header>
+        <div align="center" style="background-color: rgb(255, 181, 176)" class="errorMissing" id="errorMissing"></div>
+        <div class="slds-modal__content slds-p-around_medium" id="customerBody">
+          <lightning:select aura:id="recordStatusPicklist" disabled="true" value="{!v.itm.Record_Type__c}"
+            onchange="{!c.handleRecordStatusOnChange}" name="recordStatusPicklist" label="Record Type" required="true">
+            <!--<option value = "">Select Record Type</option>-->
+
+            <aura:if isTrue="{!v.appName == 'Material'}">
+              <option value="Material">Material</option>
+              <aura:set attribute="else">
+                <aura:if isTrue="{!v.appName == ''}">
+                  <option value="">Select Record Type</option>
+                  <aura:iteration items="{!v.recordStatusMap}" var="itms" indexVar="key">
+                    <option text="{!itms.value}" value="{!itms.key}" selected="{!itms.key==v.itm.Record_Type__c}" />
+                  </aura:iteration>
+                </aura:if>
+              </aura:set>
+            </aura:if>
+          </lightning:select>
+          <aura:if isTrue="{!v.itm.Record_Type__c == 'Material'}">
+            <lightning:select aura:id="SalesCompanyPicklist" value="{!v.cmpsales.Name}"
+              onchange="{!c.handleSalesCmpOnChange}" name="CompanyPicklist" label="Company" required="true"
+              readonly="true">
+              <option value="">Select Company</option>
+              <aura:iteration items="{!v.SalesCompanyMap}" var="itms" indexVar="key">
+                <option text="{!itms.value}" value="{!itms.key}" selected="{!itms.key==v.cmpsales.Name}" />
+              </aura:iteration>
+            </lightning:select>
+
+            <lightning:select name="monthList" label="Month:" aura:id="monthList"
+              onchange="{!c.handleMonthListOnChange}" value="{!v.selectedMonth}" required="true">
+              <option value="">Select Month</option>
+              <aura:iteration items="{!v.optionss}" var="option">
+                <option text="{!option.label}" value="{!option.id}" selected="{!option.id == v.selectedMonth}" />
+              </aura:iteration>
+            </lightning:select>
+
+            <lightning:select aura:id="yearDynamicList" value="{!v.selectedYear}" onchange="{!c.handleYearOnChange}"
+              name="yearDynamicList" label="Year" required="true">
+              <option value="">Select Year</option>
+              <aura:iteration items="{!v.yearList}" var="years">
+                <option text="{!years}" value="{!years}" />
+              </aura:iteration>
+            </lightning:select>
+
+            <lightning:select aura:id="fileDelimiter" name="fileDelimiter" label="File Delimiter" required="true">
+              <option value=",">Comma</option>
+              <option value=";">Semi Colon</option>
+            </lightning:select>
+          </aura:if>
+          <br />
+          <input aura:id="file" type="file" accept=".csv" label="Upload Attachment" />
+          <lightning:button variant="brand" label="Upload" aura:id="uploadButton" onclick="{!c.bulkFileProcess}"
+            disabled="{!v.isButtonActive}" />
+        </div>
+      </div>
+    </section>
+    <div aura:id="inventoryModalBackdrop" class="slds-backdrop"></div>
+  </div>
+  <!-- Modal PopUp -->
+  <!-- error validation Modal PopUp -->
+  <div>
+    <section aura:id="inventoryErrorModal" role="dialog" tabindex="-1" aria-labelledby="customerdata" aria-modal="true"
+      aria-describedby="customerBody" class="slds-modal">
+      <div class="slds-modal__container">
+        <header class="slds-modal__header" style="background-color: #66d3fa">
+          <lightning:buttonIcon class="slds-modal__close" alternativeText="Close" iconName="utility:close"
+            onclick="{!c.closeErrorModal}" variant="bare-inverse" size="large"></lightning:buttonIcon>
+          <h3 id="customerdata" style=" text-align: center; color: white; font-family: Arial, sans-serif; ">
+            <b>Error in the data File Uploaded, Please click the 'Error Details' link</b>
+          </h3>
+        </header>
+      </div>
+    </section>
+    <div aura:id="inventoryErrorModalBackdrop" class="slds-backdrop"> </div>
+  </div>
+  <!--error validation Modal PopUp -->
+  <!-- error file format Modal PopUp -->
+  <div>
+    <section aura:id="errorFileFormatModal" role="dialog" tabindex="-1" aria-labelledby="customerdata" aria-modal="true"
+      aria-describedby="customerBody" class="slds-modal">
+      <div class="slds-modal__container">
+        <header class="slds-modal__header" style="background-color: #66d3fa">
+          <lightning:buttonIcon class="slds-modal__close" alternativeText="Close" iconName="utility:close"
+            onclick="{!c.closeErrorFileFormatModal}" variant="bare-inverse" size="large"></lightning:buttonIcon>
+          <h3 id="customerdata" style=" text-align: center; color: white; font-family: Arial, sans-serif; ">
+            Error in Format of the data File Uploaded
+          </h3>
+        </header>
+      </div>
+    </section>
+    <div aura:id="errorFileFormatModalBackdrop" class="slds-backdrop"></div>
+  </div>
+  <!--error file format Modal PopUp -->
+  <!-- data already submitted Modal PopUp -->
+  <div>
+    <section aura:id="dataSubmittedModal" role="dialog" tabindex="-1" aria-labelledby="customerdata" aria-modal="true"
+      aria-describedby="customerBody" class="slds-modal">
+      <div class="slds-modal__container">
+        <header class="slds-modal__header" style="background-color: #66d3fa">
+          <lightning:buttonIcon class="slds-modal__close" alternativeText="Close" iconName="utility:close"
+            onclick="{!c.closeDataSubmittedModal}" variant="bare-inverse" size="large"></lightning:buttonIcon>
+          <h3 id="customerdata" style=" color: red; text-align: center; font-family: Arial, sans-serif; ">
+            The File data as already been submitted
+          </h3>
+        </header>
+      </div>
+    </section>
+    <div aura:id="dataSubmittedModalBackdrop" class="slds-backdrop"></div>
+  </div>
+  <!--data already submitted Modal PopUp -->
+  <!-- Reduce Modal-Pop Starting -->
+  <aura:html tag="style">
+    .slds-modal__container{ height : auto; width: 80%; max-width: 65vh; }
+  </aura:html>
+  <!-- Reduce Modal-Pop Ending -->
+  <!-- Search function begin -->
+  <table align="center">
+    <tr>
+      <td align="center" style="width: 150px; padding-left: 50px ">
+        <lightning:select aura:id="companyLstval" onchange="{!c.FilterRecordsBasedOnCompany}" name="companyLstval"
+          label="Filter By Company" class="slds-form-element1">
+          <option value="">Please Select a Company</option>
+          <aura:iteration items="{!v.SalesCompanyMap}" var="itms" indexVar="key">
+            <option text="{!itms.value}" value="{!itms.key}" />
+          </aura:iteration>
+        </lightning:select>
+      </td>
+
+      <td style="width: 150px; padding-left: 50px">
+        <lightning:select aura:id="yearLstval" onchange="{!c.FilterRecordsBasedOnYear}" name="yearLstval"
+          label="Filter By Year" class="slds-form-element1">
+          <option value="">Please Select a Year</option>
+          <aura:iteration items="{!v.prvsyearList}" var="prvyears">
+            <option text="{!prvyears}" value="{!prvyears}" />
+          </aura:iteration>
+        </lightning:select>
+      </td>
+      <td style="width: 150px; padding-left: 50px ; padding-right: 50px">
+        <!--lightning:select aura:id="monthLstval"  onchange="{!c.FilterRecordsBasedOnPeriod}" name="monthLstval" label="Filter By Month" class="slds-form-element1" >
+            <option value = "">Please select a Month</option>  
+                    <aura:iteration items="{!v.optionss}" var="option">
+                    <option text="{!option.label}" value="{!option.id}"  /> 
+                </aura:iteration> 
+        </lightning:select-->
+
+        <lightning:select aura:id="batchLstval" onchange="{!c.FilterRecordsBasedOnBatchStatus}" name="batchLstval"
+          label="Filter By Batch Status" class="slds-form-element1">
+          <option value="">Please Select a Batch Status</option>
+          <aura:iteration items="{!v.batchstatusList}" var="option">
+            <option text="{!option}" value="{!option}" />
+          </aura:iteration>
+        </lightning:select>
+      </td>
+    </tr>
+  </table>
+  <!-- <lightning:layoutItem class="searchBox" padding="around-small" size="4">
+        <table >
+            <tr>
+                <div style="height:50px;"> 
+                    <td>
+                        <div style="width:150px;margin:4px;">
+                            <lightning:input  aura:id="frmDate" value="{!v.fromdate}" type="date" label="From"></lightning:input> 
+                        </div>
+                    </td>
+                    <td>
+                        <div style="width:150px;margin:4px;">
+                           <lightning:input  aura:id="toDate" value="{!v.todate}" type="date" label="To"></lightning:input> 
+                        </div>
+                    </td> 
+                    <aura:if isTrue="{!v.appName == 'InventoryUpload'}">
+                        <td valign="bottom">&nbsp; &nbsp;<lightning:button variant="brand" label="Search" aura:id="" onclick="{!c.handleSearchClick}" /></td>
+                        <aura:set attribute="else">
+                            <aura:if isTrue="{!v.appName == 'InventorySales'}">
+                                <td valign="bottom">&nbsp; &nbsp;<lightning:button variant="brand" label="Search" aura:id="" onclick="{!c.handleSearchClick}" /></td>
+                            </aura:if>
+                        </aura:set>
+                    </aura:if>                    
+                    <aura:if isTrue="{!v.appName == 'SalesUpload'}">
+                        <td valign="bottom" >&nbsp; &nbsp;<lightning:button  variant="brand" label="Search" aura:id="" onclick="{!c.handleSalesSearchClick}"  /></td>
+                    </aura:if> 
+                    <td><td valign="bottom" >&nbsp; &nbsp;<lightning:button  class="slds-button" variant="brand-outline" label="View Upload Summary Report" aura:id="" onclick="{!c.gotoURL_ViewUploadSummary}"  /></td></td>
+                    <td>&nbsp;</td>
+                </div>
+            </tr>            
+            <tr>
+                <div  style="height:100px;">
+                    <td> 
+                        <div  style="width:150px;">
+                            <lightning:select  aura:id="recordStatusPicklist" value="{!v.record.Record_Type__c}" onchange="{!c.handleRecordTypeSearchOnChange}" name="recordStatusPicklist" label="Record Type" required="true">
+                                <aura:if isTrue="{!v.appName == 'InventoryUpload'}">
+                                    <option value = "Inventory">Inventory</option>
+                                    <aura:set attribute="else">
+                                        <aura:if isTrue="{!v.appName == 'SalesUpload'}">
+                                            <option value = "Sales">Sales</option>
+                                            <aura:set attribute="else">
+                                                <aura:if isTrue="{!v.appName == 'InventorySales'}">
+                                                    <aura:iteration items="{!v.recordStatusMap}" var="itms" indexVar="key">
+                                                        <option text="{!itms.value}" value="{!itms.key}" selected="{!itms.key==v.record.Record_Type__c}" />
+                                                    </aura:iteration>
+                                                </aura:if>
+                                            </aura:set>
+                                        </aura:if>
+                                    </aura:set>
+                                </aura:if>
+                            </lightning:select>  
+                        </div>
+                    </td>
+                    <td> 
+                        <div  style="margin:4px;width:150px;">
+                            <lightning:select aura:id="batchStatusPicklist" value="{!v.record.Batch_Status__c}" name="recordStatusPicklist" label="Batch Status" required="true" >
+                                <option value = "">Select Batch Status</option>
+                                <option value="1 - Migration Success">1 - Migration Success</option>
+                                <option value="2 - Migration Fail">2 - Migration Fail</option>
+                            </lightning:select>
+                        </div>
+                    </td> 
+                    <td>
+                        <div style="margin:4px;width:150px;">
+                            <lightning:select aura:id="SalesCompanyPicklist"  value="{!v.cmpsalesSearch.Name}" onchange="{!c.handleSalesCmpOnSearch}" name="CompanyPicklist" label="Company" required="true" >
+                                <option value = "">Select Company</option>
+                                <aura:iteration items="{!v.SalesCompanyMap}" var="itms" indexVar="key">
+                                    <option text="{!itms.value}" value="{!itms.key}" selected="{!itms.key==v.cmpsalesSearch.Name}" />
+                                </aura:iteration>
+                            </lightning:select>
+                        </div>
+                    </td>  -->
+  <!--  <aura:if isTrue="{!v.appName == 'InventoryUpload'}">
+                        <td valign="bottom">&nbsp; &nbsp;<lightning:button variant="brand" label="Search" aura:id="" onclick="{!c.handleSearchClick}" /></td>
+                        <aura:set attribute="else">
+                            <aura:if isTrue="{!v.appName == 'InventorySales'}">
+                                <td valign="bottom">&nbsp; &nbsp;<lightning:button variant="brand" label="Search" aura:id="" onclick="{!c.handleSearchClick}" /></td>
+                            </aura:if>
+                        </aura:set>
+                    </aura:if>
+                    <aura:if isTrue="{!v.appName == 'SalesUpload'}">
+                        <td valign="bottom" >&nbsp; &nbsp;<lightning:button  variant="brand" label="Search" aura:id="" onclick="{!c.handleSalesSearchClick}"  /></td>
+                    </aura:if>  -->
+
+  <!--  <td>
+                        <aura:if isTrue="{!v.appName == 'SalesUpload'}">
+                            <lightning:input style="margin:4px;width:150px;" type="search" aura:id="batchNoSearch" label="Batch Number" placeholder="Enter batch no..."/>
+                        </aura:if>
+                    </td>               
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td> 
+                </div>
+            </tr>            
+        </table>
+    </lightning:layoutItem> -->
+
+  <lightning:navigation aura:id="navId" />
+  <br />
+  <lightning:layout multipleRows="True">
+    <aura:if isTrue="{!v.toggleSpinner}">
+      <div class="slds-text-body_small slds-text-color_error">
+        Uploading...
+        <div class="slds-spinner_container">
+          <div role="status" class="slds-spinner slds-spinner_large slds-spinner_brand">
+            <span class="slds-assistive-text">Loading</span>
+            <div class="slds-spinner__dot-a"></div>
+            <div class="slds-spinner__dot-b"></div>
+          </div>
+        </div>
+      </div>
+    </aura:if>
+    <lightning:layoutItem class="box" padding="around-small" size="12">
+      <lightning:card title="Upload Transaction Master" iconName="utility:list">
+        <div style="height: 400px">
+          <div class="slds-scrollable_y" style="height: 100%">
+            <table id="row"
+              class="slds-table slds-table_bordered slds-table_striped slds-table_cell-buffer slds-table_col-bordered slds-table_fixed-layout">
+              <col width="100px" />
+              <col width="60px" />
+              <col width="60px" />
+              <col width="60px" />
+              <col width="120px" />
+              <col width="120px" />
+              <col width="60px" />
+              <col width="40px" />
+              <col width="60px" />
+              <col width="106px" />
+              <thead class="row">
+                <tr>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Batch_No">
+                      Batch No
+                    </div>
+                  </th>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Uploaded_By">
+                      Uploaded By
+                    </div>
+                  </th>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Record_Type">
+                      Record Type
+                    </div>
+                  </th>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Total_Row_Count">
+                      Total Row Count
+                    </div>
+                  </th>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Batch_Status">
+                      Batch Status
+                    </div>
+                  </th>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Company_Name">
+                      Company Name
+                    </div>
+                  </th>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Year">
+                      Year
+                    </div>
+                  </th>
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Month">
+                      Month
+                    </div>
+                  </th>
+                  <!-- <th scope="col" ><div align = "center"   class="slds-truncate" title="Market">Market</div></th> -->
+                  <th scope="col">
+                    <div align="center" class="slds-truncate" title="Admin Only">
+                      Admin Only
+                    </div>
+                  </th>
+                  <th scope="col" style="width: 210px">
+                    <div align="center" class="slds-truncate" title="Actions">
+                      Action
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+
+                <aura:iteration items="{!v.data}" var="data">
+                  <tr>
+                    <aura:if isTrue="{!data.Batch_Status__c == '8 - Migration Success'}">
+                      <td>
+                        <div align="center" class="slds-truncate">
+                          <lightning:button class="slds-button_text-destructive slds-button_stretch" variant="base"
+                            label="view" aura:id="{!data.Id}" name="{!data.Id}" onclick="{!c.link}">
+                            {!data.Batch_No__c}&nbsp;
+                          </lightning:button>
+                        </div>
+                      </td>
+                      <aura:set attribute="else">
+                        <td>
+                          <div align="center" class="slds-truncate">
+                            {!data.Batch_No__c}&nbsp;
+                          </div>
+                        </td>
+                      </aura:set>
+                    </aura:if>
+                    <td>
+                      <div align="center" class="slds-truncate">
+                        {!data.File_Uploaded_By__c}&nbsp;
+                      </div>
+                    </td>
+                    <td>
+                      <div align="center" class="slds-truncate">
+                        {!data.Record_Type__c}&nbsp;
+                      </div>
+                    </td>
+                    <td>
+                      <div align="center" class="slds-truncate">
+                        {!data.Total_Row_Count__c}&nbsp;
+                      </div>
+                    </td>
+                    <!-- <aura:if isTrue="{!v.appName == 'InventoryUpload'}">
+                                                    <td><div align="center" class="slds-truncate">{!data.Uploaded_Total_Stock_In_Qty__c}&nbsp;</div></td>
+                                                    <td><div align="center" class="slds-truncate">{!data.Mainetti_Company__c}&nbsp;</div></td>
+                                                    <aura:set attribute="else">
+                                                        <aura:if isTrue="{!v.appName == 'InventorySales'}">
+                                                            <td><div align="center" class="slds-truncate">{!data.Uploaded_Total_Stock_In_Qty__c}&nbsp;</div></td>
+                                                            <td><div align="center" class="slds-truncate">{!data.Mainetti_Company__c}&nbsp;</div></td>
+                                                        </aura:if>
+                                                    </aura:set>
+                                                </aura:if> -->
+                    <!-- <td><div align="center" class="slds-truncate">{!data.Batch_Status__c == '5 - Azure File Upload In Progress'? 'Upload process was aborted by user' : data.Batch_Status__c}&nbsp;</div></td> -->
+
+                    <aura:if isTrue="{!data.Batch_Status__c == '8 - Migration Success'}">
+                      <td>
+                        <div align="center" class="slds-truncate">
+                          <img src="{!$Resource.SuccessUpload}" />
+                        </div>
+                      </td>
+                      <aura:set attribute="else">
+                        <aura:if isTrue="{!data.Batch_Status__c == '3 - Error In Data Validation'}">
+                          <td>
+                            <div align="center" class="slds-truncate">
+                              <img src="{!$Resource.validationfail}" />
+                            </div>
+                          </td>
+                          <aura:set attribute="else">
+                            <aura:if isTrue="{!data.Batch_Status__c == '9 - Migration Fail'}">
+                              <td>
+                                <div align="center" class="slds-truncate">
+                                  <img src="{!$Resource.ContactCRM}" />
+                                </div>
+                              </td>
+                              <aura:set attribute="else">
+                                <aura:if
+                                  isTrue="{!and(data.Batch_Status__c != '8 - Migration Success',data.Batch_Status__c != '3 - Error In Data Validation',data.Batch_Status__c != '9 - Migration Fail')}">
+                                  <td>
+                                    <div align="center" class="slds-truncate">
+                                      <img src="{!$Resource.LoadingGIF}" width="50" height="50" />
+                                    </div>
+                                  </td>
+
+
+                                </aura:if>
+                              </aura:set>
+                            </aura:if>
+                          </aura:set>
+                        </aura:if>
+                      </aura:set>
+                    </aura:if>
+
+                    <aura:if isTrue="{!v.appName == 'Material'}">
+                      <td>
+                        <div align="center" class="slds-truncate">
+                          {!data.Sales_Company__c}&nbsp;
+                        </div>
+                      </td>
+                      <td>
+                        <div align="center" class="slds-truncate">
+                          {!data.Sales_Year__c}&nbsp;
+                        </div>
+                      </td>
+                      <td>
+                        <div align="center" class="slds-truncate">
+                          {!data.Sales_Month__c}&nbsp;
+                        </div>
+                      </td>
+                      <!--  <td><div align="center" class="slds-truncate">{!data.Sales_Market__c}&nbsp;</div></td> -->
+                      <aura:set attribute="else">
+                        <aura:if isTrue="{!v.appName == 'InventorySales'}">
+                          <aura:if isTrue="{!data.company_week__c != null}">
+                            <td>
+                              <div align="center">
+                                <lightning:button class="slds-button_text-destructive slds-button_stretch"
+                                  label="View Missing Data" aura:id="{!data.Id}" name="{!data.Id}"
+                                  onclick="{!c.companyWeekMissing}" />
+                              </div>
+                            </td>
+                            <aura:set attribute="else">
+                              <td>
+                                <div align="center"></div>
+                              </td>
+                            </aura:set>
+                          </aura:if>
+                        </aura:if>
+                      </aura:set>
+                    </aura:if>
+                    <!--   <aura:if isTrue="{!data.Reprocessing__c != false}">
+                                                    <td>
+                                                        <div align="center">
+                                                            <lightning:button class="slds-button_text-destructive" label="view" aura:id="{!data.Id}" name="{!data.Id}" onclick="{!c.viewAdmin}" />
+                                                        </div>
+                                                    </td>
+                                                    <aura:set attribute="else">
+                                                        <td><div align="center"></div></td>
+                                                    </aura:set>
+                                                </aura:if>  -->
+                    <aura:if isTrue="{!data.Reprocessing__c != false}">
+                      <td>
+                        <div align="center">
+                          <!-- View for admin -->
+                          <!-- <lightning:button class="slds-button_text-destructive" label="view" aura:id="{!data.Id}" name="{!data.Id}" onclick="{!c.viewAdmin}" />
+                          <br/> -->
+                          <aura:if isTrue="{!data.Void__c == 'Delete Request Submitted'}">
+                            <lightning:button class="slds-button_text-destructive slds-button_stretch" label="Delete"
+                              aura:id="{!data.Id}" name="{!data.Id}" onclick="{!c.deleteAdmin}" />
+                            <aura:set attribute="else">
+                              <aura:if isTrue="{!data.Void__c == 'Delete Request In Progress'}">
+                      <td>
+                        <div align="center">
+
+                          <lightning:icon iconName="standard:recycle_bin" alternativeText="Delete In Progress"
+                            title="Delete is in Progress, on completion confirmation mail will be Sent" />
+                          <p>
+                            <lightning:formattedText value="In Progress" />
+                          </p>
+                        </div>
+                      </td>
+                      <aura:set attribute="else">
+                        <td>
+                          <div align="center"></div>
+                        </td>
+                      </aura:set>
+                    </aura:if>
+                    </aura:set>
+                    </aura:if>
+          </div>
+          </td>
+          <aura:set attribute="else">
+            <aura:if isTrue="{!data.Void__c == 'Delete Request Submitted'}">
+              <td>
+                <div align="center">
+                  <lightning:button class="slds-button_text-destructive slds-button_stretch" label="Delete"
+                    aura:id="{!data.Id}" name="{!data.Id}" iconName="utility:delete" iconPosition="left"
+                    onclick="{!c.deleteAdmin}" />
+                </div>
+              </td>
+              <aura:set attribute="else">
+                <td>
+                  <div align="center"></div>
+                </td>
+              </aura:set>
+            </aura:if>
+          </aura:set>
+          </aura:if>
+          <aura:if
+            isTrue="{!and(data.Batch_Status__c != '8 - Migration Success',data.Batch_Process__c == 'Completed')}">
+            <td>
+              <div align="center" data-value="{!data.Record_Type__c}">
+                <lightning:button class="slds-button_text-destructive slds-button_stretch" label="View Error"
+                  iconName="utility:error" iconPosition="left" aura:id="{!data.Id}" name="{!data.Id}"
+                  value="{!data.Record_Type__c}" onclick="{!c.viewError}" />
+
+                <br />
+                <lightning:button class="slds-button_text-destructive slds-button_stretch" label="Re-Upload"
+                  iconName="utility:refresh" iconPosition="left" aura:id="{!data.Id}" name="{!data.Id}"
+                  onclick="{!c.reuploadfile}" />
+              </div>
+            </td>
+            <aura:set attribute="else">
+              <aura:if isTrue="{!data.Batch_Status__c == '8 - Migration Success'}">
+                <td>
+                  <div align="center">
+                    <lightning:button class="slds-button slds-button_success slds-button_stretch button-text"
+                      label="Converted File" iconName="utility:download" iconPosition="left" aura:id="{!data.Id}"
+                      name="{!data.upload_file_name__c}" onclick="{!c.downloadConvertedCSV}" />
+                    <br />
+                    <aura:if isTrue="{!data.CreatedDate > '2021-07-01T12:23:11.000+0000'}">
+                      <lightning:button class="slds-button slds-button_brand slds-button_stretch button-text"
+                        label="Original File" iconName="utility:download" iconPosition="left" aura:id="{!data.Id}"
+                        name="{!data.Upload_Converted_File_Name__c}" onclick="{!c.downloadCSV}" />
+
+                    </aura:if>
+                  </div>
+                </td>
+                <aura:set attribute="else">
+                  <aura:if
+                    isTrue="{! and(data.Batch_Process__c =='Not Started', data.Batch_Status__c == '0 - Initial')}">
+                    <td>
+                      <div align="center">
+                        <lightning:button class="slds-button slds-button_text-destructive slds-button_stretch"
+                          label="Delete Fail Batch" iconName="utility:delete" iconPosition="left"
+                          title="This is incomplete record , click to delete!" aura:id="{!data.Id}" name="{!data.Id}"
+                          value="{!data.CreatedDate}" onclick="{!c.deleteDefunctBatch}" />
+                      </div>
+                    </td>
+                    <aura:set attribute="else">
+                      <td>
+                        <div align="center">&nbsp;</div>
+                      </td>
+                    </aura:set>
+                  </aura:if>
+                </aura:set>
+              </aura:if>
+            </aura:set>
+          </aura:if>
+          </tr>
+          </aura:iteration>
+          </tbody>
+          </table>
+          <aura:if isTrue="{!v.data.length==0}">
+            <div class="slds-box slds-align_absolute-center" style="height:5rem">
+              <h2 style="font-weight:bold; font-size:large">No Records Found</h2>
+            </div>
+          </aura:if>
+        </div>
+        </div>
+      </lightning:card>
+    </lightning:layoutItem>
+  </lightning:layout>
+
+  <aura:if isTrue="{!v.childRecordType =='Inventory'}">
+    <c:batchDetail aura:id="batchDetail" />
+  </aura:if>
+  <aura:if isTrue="{!v.childRecordType =='Sales'}">
+    <c:BatchSales aura:id="salesDetail" />
+  </aura:if>
+
+  <!-- Modal Popup -->
+  <!-- Modal/Popup for openBulkUploadConfirmation-->
+  <aura:if isTrue="{!v.openBulkUploadConfirmation}">
+    <div>
+      <section aura:id="salesModalPopUp" role="dialog" tabindex="-1" aria-labelledby="modal-heading-01"
+        aria-modal="true" aria-describedby="modal-content-id-1"
+        class="slds-modal slds-fade-in-open slds-align_absolute-center">
+        <div class="slds-modal__container">
+          <!-- Modal/Popup Box Header Starts here-->
+          <header class="slds-modal__header">
+            <lightning:buttonIcon class="slds-modal__close" alternativeText="Close" iconName="utility:close"
+              onclick="{!c.closeBulkUploadConfirmation}" variant="bare-inverse" size="large"></lightning:buttonIcon>
+            <h3 id="customerdata" style="
+                text-align: center;
+                color: black;
+                font-family: Arial, sans-serif;
+              ">
+              Due to large data volume your Request for Material data upload is
+              getting processed in the background. Please don't close the
+              browser window.
+            </h3>
+            <img src="{!$Resource.UploadingGif}" width="150" height="150" />
+          </header>
+        </div>
+      </section>
+      <div aura:id="salesModalPopUpBackdrop" class="slds-backdrop slds-backdrop_open"></div>
+    </div>
+  </aura:if>
+  <aura:if isTrue="{!v.openFileDataSubmitted}">
+    <div>
+      <section aura:id="openFileDataSubmitted" role="dialog" tabindex="-1" aria-labelledby="modal-heading-01"
+        aria-modal="true" aria-describedby="modal-content-id-1"
+        class="slds-modal slds-fade-in-open slds-align_absolute-center">
+        <div class="slds-modal__container">
+          <!-- Modal/Popup Box Header Starts here-->
+          <header class="slds-modal__header">
+            <lightning:buttonIcon class="slds-modal__close" alternativeText="Close" iconName="utility:close"
+              onclick="{!c.closeModalopenFileDataSubmittedModal}" variant="bare-inverse" size="large">
+            </lightning:buttonIcon>
+            <h3 id="customerdata" style="
+                text-align: center;
+                color: black;
+                font-family: Arial, sans-serif;
+              ">
+              <b>Your request for Material Upload has been submitted
+                Successfully.Your data is getting processed in the
+                background.Once file processing is completed you will receive an
+                email Notification on the Batch Status'</b>
+            </h3>
+            <img src="{!$Resource.ProcessingGif}" />
+          </header>
+        </div>
+      </section>
+      <div aura:id="openFileDataSubmittedBackdrop" class="slds-backdrop slds-backdrop_open"></div>
+    </div>
+  </aura:if>
+  <!-- Maintaince Modal PopUp -->
+  <aura:if isTrue="{!v.openMaintainceModal}">
+    <div>
+      <section aura:id="MaintainceModal" role="dialog" tabindex="-1" aria-labelledby="customerdata" aria-modal="true"
+        aria-describedby="customerBody" class="slds-modal slds-fade-in-open">
+        <div class="slds-modal__container">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <header class="slds-modal__header">
+            <p id="customerdata" class="slds-text-heading">
+              Material Upload Announcement
+            </p>
+          </header>
+          <div align="center" class="errorMissing" id="errorMissing"></div>
+          <aura:if isTrue="{!v.MaintainceAdminAccess}">
+            <div class="slds-modal__content slds-p-around_medium" align="center" id="customerBody">
+              <p id="customerdata" class="slds-text-heading slds-hyphenate slds-text-heading_small">
+                Material Upload will under maintenance during below period
+              </p>
+              <br />
+              <p id="customerdata" class="slds-text-heading slds-hyphenate slds-text-heading_small">
+                <b>Start : </b>
+                <lightning:formattedDateTime value="{!v.MaintainceStartDate}" year="2-digit" month="short" day="2-digit"
+                  weekday="long" />
+                <br />
+                <b>End : </b>
+                <lightning:formattedDateTime value="{!v.MaintainceEndDate}" year="2-digit" month="short" day="2-digit"
+                  weekday="long" />
+              </p>
+              <br />
+              <br />
+              <button class="slds-button slds-button_neutral slds-button_stretch" onclick="{!c.onclickContinueUpload}">
+                Click to Continue Upload
+              </button>
+              <br />
+            </div>
+            <aura:set attribute="else">
+              <div class="slds-modal__content slds-p-around_medium" align="center" id="customerBody">
+                <p id="customerdata" class="slds-text-heading slds-hyphenate slds-text-heading_small">
+                  Material will under maintenance during below period
+                </p>
+                <br />
+                <p id="customerdata" class="slds-text-heading slds-hyphenate slds-text-heading_small">
+                  <b>Start : </b>
+                  <lightning:formattedDateTime value="{!v.MaintainceStartDate}" year="2-digit" month="short"
+                    day="2-digit" weekday="long" />
+                  <br />
+                  <b>End : </b>
+                  <lightning:formattedDateTime value="{!v.MaintainceEndDate}" year="2-digit" month="short" day="2-digit"
+                    weekday="long" />
+                </p>
+                <br />
+                <br />
+                <p id="customerdata" class="slds-text-heading slds-hyphenate slds-text-heading_small">
+                  You are not allowed to edit it during Maintaince.
+                </p>
+                <br />
+                <aura:if isTrue="{!v.withinperiod}">
+                  <button class="slds-button slds-button_neutral " onclick="{!c.onclickContinueUpload}">
+                    Click to Continue Upload
+                  </button>
+                </aura:if>
+              </div>
+            </aura:set>
+          </aura:if>
+        </div>
+      </section>
+      <div aura:id="MaintainceModalBackdrop" class="slds-backdrop slds-backdrop_open"></div>
+    </div>
+  </aura:if>
+  <!-- Modal PopUp -->
+</aura:component>
